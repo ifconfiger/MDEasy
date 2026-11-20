@@ -24,7 +24,12 @@ pub fn run(workspace: Entity<Workspace>, window: AnyWindowHandle, cx: &mut App) 
         let wait = move |ms| executor.timer(Duration::from_millis(ms));
         let shot = |name: &str, cx: &mut AsyncApp| {
             let path = dir.join(format!("{name}.png"));
-            let result = window.update(cx, |_, window, _| window.render_to_image());
+            let result = window.update(cx, |_, window, cx| {
+                // 强制重新绘制一帧，避免拿到旧画面
+                window.refresh();
+                window.draw(cx).clear(cx);
+                window.render_to_image()
+            });
             match result {
                 Ok(Ok(img)) => match img.save(&path) {
                     Ok(()) => eprintln!("screenshot: {}", path.display()),
@@ -65,7 +70,7 @@ pub fn run(workspace: Entity<Workspace>, window: AnyWindowHandle, cx: &mut App) 
         shot("9-edit", cx);
 
         act(Box::new(SplitMode), cx);
-        _ = cx.update(|cx| cx.quit());
+        cx.update(|cx| cx.quit());
     })
     .detach();
 }

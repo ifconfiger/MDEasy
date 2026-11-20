@@ -38,10 +38,38 @@ macOS 用 `⌘`，Windows / Linux 用 `Ctrl`。
 cargo run --release                          # 运行
 cargo run --release -- path/to/file.md dir/  # 启动时打开文件或文件夹
 cargo test -p mdeasy-core                    # 核心逻辑测试
-scripts/bundle-macos.sh                      # 打包 target/release/MDEasy.app（含图标与文件关联）
+scripts/bundle-macos.sh                      # 打包 target/release/MDEasy.app，并设为 md/json/yaml/toml 默认打开程序
+scripts/bundle-macos.sh --install            # 同上，但安装到 /Applications 并让关联指向那里（推荐）
+scripts/bundle-macos.sh --no-default         # 只打包注册，不改默认打开程序
 ```
 
 Windows 构建时自动把 `assets/icon/mdeasy.ico` 嵌入 exe。
+
+## 下载与自动更新
+
+在 [Releases](https://github.com/ifconfiger/MDEasy/releases) 下载对应平台的安装包：
+
+| 平台 | 文件 |
+|---|---|
+| macOS（Apple 芯片） | `MDEasy-<版本>-macos-arm64.zip`，解压后把 `MDEasy.app` 拖进“应用程序” |
+| Windows x64 | `MDEasy-<版本>-windows-x64.zip`，解压后运行 `mdeasy.exe` |
+| Linux x64 | `MDEasy-<版本>-linux-x64.tar.gz`，内含 `mdeasy`、`mdeasy.desktop`、图标 |
+
+macOS 安装包只做了临时签名（没有 Apple 开发者证书公证），第一次打开时如果提示“无法验证开发者”，在“系统设置 → 隐私与安全性”里点“仍要打开”，或运行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/MDEasy.app
+```
+
+应用每天启动时会在后台检查一次新版本（菜单“检查更新…”可手动检查）。发现新版本后可以一键下载，校验 SHA-256 后替换当前程序并重启；从 `cargo run` 或 `target/` 目录运行的开发构建只提示、不自动安装。设置环境变量 `MDEASY_NO_UPDATE_CHECK=1` 可关闭自动检查；网络需要代理时可设置 `HTTPS_PROXY`。
+
+### 发布新版本
+
+1. 修改根目录 `Cargo.toml` 的 `version`（如 `0.2.0`），提交
+2. 打标签并推送：`git tag v0.2.0 && git push origin v0.2.0`
+3. GitHub Actions（`.github/workflows/release.yml`）会在自带 runner 上构建三个平台的安装包、生成 `SHA256SUMS.txt` 并创建 Release，已安装的 MDEasy 随后就能检测到更新
+
+标签必须与 `Cargo.toml` 的版本一致，否则构建会失败。在 Actions 页面手动运行 Release workflow 只构建、不发布，可用来试构建。
 
 ## 目录结构
 

@@ -20,7 +20,12 @@ actions!(
         ToggleSidebar,
         ToggleTheme,
         FormatDocument,
+        FormatJsonIndent4,
+        FormatJsonTab,
+        MinifyJson,
+        SortJsonKeys,
         About,
+        CheckForUpdates,
         Quit,
     ]
 );

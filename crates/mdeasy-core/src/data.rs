@@ -138,16 +138,74 @@ pub fn parse_toml(source: &str) -> Result<DataNode, ParseError> {
         })
 }
 
+/// JSON 缩进方式。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JsonIndent {
+    Spaces(u8),
+    Tab,
+    /// 压缩成一行。
+    Minify,
+}
+
+/// JSON 格式化选项。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JsonFormat {
+    pub indent: JsonIndent,
+    /// 递归按键名排序；否则保持源文件中的键顺序。
+    pub sort_keys: bool,
+}
+
+impl Default for JsonFormat {
+    fn default() -> Self {
+        Self { indent: JsonIndent::Spaces(2), sort_keys: false }
+    }
+}
+
 /// 格式化 JSON（2 空格缩进，保持键顺序）。其他格式格式化会丢注释，不提供。
 pub fn format_json(source: &str) -> Result<String, ParseError> {
-    let value: serde_json::Value = serde_json::from_str(source).map_err(|e| ParseError {
+    format_json_with(source, JsonFormat::default())
+}
+
+/// 按指定选项格式化 JSON。
+pub fn format_json_with(source: &str, opts: JsonFormat) -> Result<String, ParseError> {
+    use serde::Serialize as _;
+    use serde_json::ser::{CompactFormatter, PrettyFormatter, Serializer};
+
+    let mut value: serde_json::Value = serde_json::from_str(source).map_err(|e| ParseError {
         message: strip_position_suffix(&e.to_string()),
         line: Some(e.line()),
         column: Some(e.column()),
     })?;
-    let mut out = serde_json::to_string_pretty(&value).expect("Value 序列化不会失败");
+    if opts.sort_keys {
+        sort_keys(&mut value);
+    }
+
+    let mut buf = Vec::with_capacity(source.len());
+    let indent = match opts.indent {
+        JsonIndent::Spaces(n) => " ".repeat(n as usize).into_bytes(),
+        JsonIndent::Tab => b"\t".to_vec(),
+        JsonIndent::Minify => Vec::new(),
+    };
+    let result = if opts.indent == JsonIndent::Minify {
+        value.serialize(&mut Serializer::with_formatter(&mut buf, CompactFormatter))
+    } else {
+        value.serialize(&mut Serializer::with_formatter(&mut buf, PrettyFormatter::with_indent(&indent)))
+    };
+    result.expect("Value 序列化不会失败");
+    let mut out = String::from_utf8(buf).expect("serde_json 输出 UTF-8");
     out.push('\n');
     Ok(out)
+}
+
+fn sort_keys(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.sort_keys();
+            map.values_mut().for_each(sort_keys);
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(sort_keys),
+        _ => {}
+    }
 }
 
 fn from_json(v: serde_json::Value) -> DataNode {
@@ -269,6 +327,16 @@ mod tests {
     #[test]
     fn format_json_pretty_prints() {
         assert_eq!(format_json(r#"{"a":[1,2]}"#).unwrap(), "{\n  \"a\": [\n    1,\n    2\n  ]\n}\n");
+    }
+
+    #[test]
+    fn format_json_options() {
+        let src = r#"{ "b": 1, "a": { "d": [true], "c": null } }"#;
+        let fmt = |indent, sort_keys| format_json_with(src, JsonFormat { indent, sort_keys }).unwrap();
+        assert_eq!(fmt(JsonIndent::Minify, false), "{\"b\":1,\"a\":{\"d\":[true],\"c\":null}}\n");
+        assert_eq!(fmt(JsonIndent::Minify, true), "{\"a\":{\"c\":null,\"d\":[true]},\"b\":1}\n");
+        assert_eq!(fmt(JsonIndent::Tab, false).lines().nth(1), Some("\t\"b\": 1,"));
+        assert_eq!(fmt(JsonIndent::Spaces(4), false).lines().nth(1), Some("    \"b\": 1,"));
     }
 
     #[test]

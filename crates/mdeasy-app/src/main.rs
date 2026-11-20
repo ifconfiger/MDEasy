@@ -7,12 +7,14 @@ mod data_view;
 mod dev_screenshot;
 mod document;
 mod sidebar;
+mod theme;
+mod update;
 mod workspace;
 
 use std::path::PathBuf;
 
 use gpui_kit::assets::Assets;
-use gpui_kit::component::{Theme, ThemeMode, TitleBar, input};
+use gpui_kit::component::{ThemeMode, TitleBar, input};
 use gpui_kit::*;
 use mdeasy_core::Session;
 
@@ -22,6 +24,7 @@ fn main() {
     // 命令行参数：要打开的文件或文件夹
     let args: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let session = Session::load();
+    update::cleanup_previous_update();
 
     // macOS：从 Finder 双击 / “打开方式”打开文件时，系统通过 open-urls 事件传入路径
     let (url_tx, mut url_rx) = futures_channel::mpsc::unbounded::<Vec<PathBuf>>();
@@ -35,11 +38,7 @@ fn main() {
 
     app.run(move |cx| {
         gpui_kit::init(cx);
-        Theme::change(
-            if session.dark { ThemeMode::Dark } else { ThemeMode::Light },
-            None,
-            cx,
-        );
+        theme::install(if session.dark { ThemeMode::Dark } else { ThemeMode::Light }, cx);
         actions::bind_keys(cx);
         cx.set_menus(app_menus());
         cx.activate(true);
@@ -69,6 +68,7 @@ fn main() {
             window.set_window_title("MDEasy");
             let workspace = cx.new(|cx| Workspace::new(session.clone(), window, cx));
             workspace.update(cx, |ws, cx| ws.restore_tabs(&session, window, cx));
+            workspace.update(cx, |_, cx| update::check_on_startup(window, cx));
             if !args.is_empty() {
                 workspace.update(cx, |ws, cx| {
                     for path in args {
@@ -128,6 +128,8 @@ fn app_menus() -> Vec<Menu> {
         Menu {
             name: "MDEasy".into(),
             items: vec![
+                MenuItem::action("检查更新…", CheckForUpdates),
+                MenuItem::separator(),
                 MenuItem::action("切换亮色 / 暗色", ToggleTheme),
                 MenuItem::separator(),
                 MenuItem::action("退出 MDEasy", Quit),
@@ -164,7 +166,12 @@ fn app_menus() -> Vec<Menu> {
                 MenuItem::action("全选", input::SelectAll),
                 MenuItem::separator(),
                 MenuItem::action("查找", input::Search),
-                MenuItem::action("格式化 JSON", FormatDocument),
+                MenuItem::separator(),
+                MenuItem::action("格式化 JSON（2 空格）", FormatDocument),
+                MenuItem::action("格式化 JSON（4 空格）", FormatJsonIndent4),
+                MenuItem::action("格式化 JSON（Tab）", FormatJsonTab),
+                MenuItem::action("JSON 按键名排序", SortJsonKeys),
+                MenuItem::action("压缩 JSON", MinifyJson),
             ],
             disabled: false,
         },

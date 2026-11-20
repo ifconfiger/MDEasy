@@ -137,41 +137,35 @@ impl Sidebar {
             let item = entry.item();
             let is_root = root_ids.contains(&item.id);
             let path = PathBuf::from(item.id.as_str());
-            let icon = if entry.is_folder() || (is_root && path.is_dir()) {
-                if entry.is_expanded() {
-                    IconName::FolderOpen
-                } else {
-                    IconName::Folder
-                }
-            } else {
-                match FileKind::from_path(&path) {
-                    Some(FileKind::Markdown) => IconName::BookOpen,
-                    Some(FileKind::Json | FileKind::Yaml | FileKind::Toml) => IconName::FileText,
-                    _ => IconName::File,
-                }
-            };
             let theme = cx.theme();
+            let dark = theme.mode.is_dark();
             let is_folder = entry.is_folder();
+            let is_dir = is_folder || (is_root && path.is_dir());
+            let (icon, icon_color) = if is_dir {
+                let icon = if entry.is_expanded() { IconName::FolderOpen } else { IconName::Folder };
+                (icon, crate::theme::folder_color(dark))
+            } else {
+                crate::theme::file_icon(FileKind::from_path(&path), dark)
+            };
 
             ListItem::new(ix)
                 .w_full()
+                .h(px(26.))
                 .rounded(theme.radius)
-                .py_0p5()
-                .px_2()
-                .pl(px(14.) * entry.depth() + px(8.))
+                .py_0()
+                .pr_2()
+                .pl(px(12.) * entry.depth() + px(8.))
+                .text_size(px(13.))
+                .text_color(theme.sidebar_foreground)
                 .child(
                     h_flex()
-                        .gap_2()
+                        .gap_1p5()
                         .min_w_0()
-                        .child(Icon::new(icon).small().text_color(if is_folder || is_root {
-                            theme.sidebar_foreground.opacity(0.8)
-                        } else {
-                            theme.muted_foreground
-                        }))
+                        .child(Icon::new(icon).size(px(15.)).text_color(icon_color))
                         .child(
                             div()
                                 .truncate()
-                                .when(is_root, |d| d.font_weight(FontWeight::MEDIUM))
+                                .when(is_root, |d| d.font_weight(FontWeight::SEMIBOLD))
                                 .child(item.label.clone()),
                         ),
                 )
@@ -203,8 +197,7 @@ impl Sidebar {
                 menu
             }
         })
-        .text_size(px(13.))
-        .px_1()
+        .px_1p5()
         .flex_1()
     }
 
@@ -263,14 +256,14 @@ impl Render for Sidebar {
             .text_color(theme.sidebar_foreground)
             .child(
                 h_flex()
-                    .h(px(36.))
+                    .h(px(34.))
                     .flex_shrink_0()
-                    .pl_3()
-                    .pr_1()
+                    .pl(px(14.))
+                    .pr_1p5()
                     .justify_between()
                     .child(
                         div()
-                            .text_xs()
+                            .text_size(px(11.))
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(theme.muted_foreground)
                             .child(if self.scanning { "资源管理器 · 扫描中" } else { "资源管理器" }),

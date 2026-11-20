@@ -239,11 +239,20 @@ impl Document {
     }
 
     /// 仅 JSON 支持格式化（YAML/TOML 重新序列化会丢注释）。
-    pub fn format(&mut self, window: &mut Window, cx: &mut Context<Self>) -> anyhow::Result<()> {
+    pub fn format(
+        &mut self,
+        opts: data::JsonFormat,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> anyhow::Result<()> {
         if self.kind != FileKind::Json {
             anyhow::bail!("只有 JSON 支持格式化");
         }
-        let formatted = data::format_json(&self.text(cx))?;
+        let text = self.text(cx);
+        let formatted = data::format_json_with(&text, opts)?;
+        if formatted == text.as_str() {
+            return Ok(());
+        }
         self.editor
             .update(cx, |state, cx| state.set_value(formatted, window, cx));
         // set_value 不触发 Change 事件，手动同步预览和保存状态

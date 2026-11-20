@@ -15,7 +15,10 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{prelude::FluentBuilder as _, *};
-use mdeasy_core::{FileKind, Session};
+use mdeasy_core::{
+    FileKind, Session,
+    data::{JsonFormat, JsonIndent},
+};
 
 use crate::{
     actions::*,
@@ -452,9 +455,9 @@ impl Workspace {
         }
     }
 
-    fn format_active(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn format_active(&mut self, opts: JsonFormat, window: &mut Window, cx: &mut Context<Self>) {
         let Some(doc) = self.active_doc().cloned() else { return };
-        if let Err(err) = doc.update(cx, |d, cx| d.format(window, cx)) {
+        if let Err(err) = doc.update(cx, |d, cx| d.format(opts, window, cx)) {
             window.push_notification(Notification::warning(err.to_string()).title("无法格式化"), cx);
         }
     }
@@ -465,6 +468,7 @@ impl Workspace {
         let theme = cx.theme();
         let doc = self.active_doc().map(|d| d.read(cx));
         let has_preview = doc.is_some_and(|d| d.kind.has_preview());
+        let is_json = doc.is_some_and(|d| d.kind == FileKind::Json);
         let title = doc.map(|d| d.title()).unwrap_or_else(|| "MDEasy".into());
         let mode = self.mode;
 
@@ -499,13 +503,15 @@ impl Workspace {
                         .min_w_0()
                         .truncate()
                         .text_center()
-                        .text_sm()
-                        .text_color(theme.muted_foreground)
+                        .text_size(px(13.))
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.foreground.opacity(0.75))
                         .child(title),
                 )
                 .child(
                     h_flex()
                         .gap_2()
+                        .when(is_json, |this| this.child(format_json_button()))
                         .when(has_preview, |this| {
                             this.child(
                                 ButtonGroup::new("view-mode")
@@ -557,7 +563,7 @@ impl Workspace {
             .id("tabs")
             .h(px(36.))
             .flex_shrink_0()
-            .bg(theme.tab_bar)
+            .bg(theme.background)
             .border_b_1()
             .border_color(theme.border)
             .child(
@@ -577,41 +583,35 @@ impl Workspace {
                             .h_full()
                             .flex_shrink_0()
                             .pl_3()
-                            .pr_1()
-                            .gap_1()
-                            .text_sm()
-                            .border_r_1()
-                            .border_color(theme.border)
+                            .pr_1p5()
+                            .gap_1p5()
+                            .text_size(px(13.))
+                            .relative()
                             .cursor_pointer()
                             .map(|this| {
                                 if active {
-                                    this.bg(theme.tab_active)
-                                        .text_color(theme.tab_active_foreground)
-                                        .relative()
+                                    this.text_color(theme.foreground)
+                                        .font_weight(FontWeight::MEDIUM)
                                         .child(
                                             div()
                                                 .absolute()
-                                                .top_0()
-                                                .left_0()
-                                                .right_0()
+                                                .bottom_0()
+                                                .left_2()
+                                                .right_2()
                                                 .h(px(2.))
+                                                .rounded_t(px(2.))
                                                 .bg(theme.primary),
                                         )
                                 } else {
-                                    this.bg(theme.tab)
-                                        .text_color(theme.tab_foreground)
-                                        .hover(|s| s.bg(theme.tab_active.opacity(0.6)))
+                                    this.text_color(theme.muted_foreground)
+                                        .hover(|s| s.text_color(theme.foreground).bg(theme.muted))
                                 }
                             })
-                            .child(
-                                Icon::new(if d.kind == FileKind::Markdown {
-                                    IconName::BookOpen
-                                } else {
-                                    IconName::FileText
-                                })
-                                .xsmall()
-                                .text_color(theme.muted_foreground),
-                            )
+                            .child({
+                                let (icon, color) =
+                                    crate::theme::file_icon(Some(d.kind), theme.mode.is_dark());
+                                Icon::new(icon).size(px(14.)).text_color(color)
+                            })
                             .child(div().max_w(px(220.)).truncate().child(d.title()))
                             .child(
                                 div()
@@ -661,6 +661,7 @@ impl Workspace {
         let theme = cx.theme();
         div()
             .size_full()
+            .pt_2()
             .bg(theme.background)
             .child(
                 Editor::new(&doc.read(cx).editor)
@@ -744,7 +745,22 @@ impl Workspace {
             .child(
                 v_flex()
                     .items_center()
-                    .gap_2()
+                    .gap_3()
+                    .child(
+                        div()
+                            .size(px(64.))
+                            .rounded(px(16.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(theme.primary)
+                            .shadow_md()
+                            .child(
+                                Icon::new(IconName::BookOpen)
+                                    .size(px(32.))
+                                    .text_color(theme.primary_foreground),
+                            ),
+                    )
                     .child(div().text_3xl().font_weight(FontWeight::BOLD).child("MDEasy"))
                     .child(
                         div()
@@ -802,12 +818,12 @@ impl Workspace {
         let theme = cx.theme();
         let doc = self.active_doc().map(|d| d.read(cx));
         h_flex()
-            .h(px(26.))
+            .h(px(24.))
             .flex_shrink_0()
             .px_3()
             .gap_4()
             .justify_between()
-            .text_xs()
+            .text_size(px(11.5))
             .text_color(theme.muted_foreground)
             .bg(theme.title_bar)
             .border_t_1()
@@ -909,7 +925,26 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &PreviewMode, w, cx| this.set_mode(ViewMode::Preview, w, cx)))
             .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| this.toggle_sidebar(cx)))
             .on_action(cx.listener(|this, _: &ToggleTheme, w, cx| this.toggle_theme(w, cx)))
-            .on_action(cx.listener(|this, _: &FormatDocument, w, cx| this.format_active(w, cx)))
+            .on_action(cx.listener(|_, _: &CheckForUpdates, w, cx| crate::update::check(true, w, cx)))
+            .on_action(cx.listener(|this, _: &FormatDocument, w, cx| {
+                this.format_active(JsonFormat::default(), w, cx)
+            }))
+            .on_action(cx.listener(|this, _: &FormatJsonIndent4, w, cx| {
+                let opts = JsonFormat { indent: JsonIndent::Spaces(4), sort_keys: false };
+                this.format_active(opts, w, cx)
+            }))
+            .on_action(cx.listener(|this, _: &FormatJsonTab, w, cx| {
+                let opts = JsonFormat { indent: JsonIndent::Tab, sort_keys: false };
+                this.format_active(opts, w, cx)
+            }))
+            .on_action(cx.listener(|this, _: &MinifyJson, w, cx| {
+                let opts = JsonFormat { indent: JsonIndent::Minify, sort_keys: false };
+                this.format_active(opts, w, cx)
+            }))
+            .on_action(cx.listener(|this, _: &SortJsonKeys, w, cx| {
+                let opts = JsonFormat { sort_keys: true, ..JsonFormat::default() };
+                this.format_active(opts, w, cx)
+            }))
             .on_action(cx.listener(|this, _: &Quit, w, cx| {
                 if this.request_quit(w, cx) {
                     cx.quit();
@@ -940,6 +975,25 @@ fn new_file_button(id: &'static str) -> impl IntoElement {
         })
 }
 
+/// JSON 格式化选项（仅 JSON 文档显示）。
+fn format_json_button() -> impl IntoElement {
+    Button::new("format-json")
+        .outline()
+        .compact()
+        .small()
+        .label("格式化")
+        .dropdown_caret(true)
+        .tooltip("格式化 JSON")
+        .dropdown_menu(|menu, _, _| {
+            menu.menu("格式化（2 空格）", Box::new(FormatDocument))
+                .menu("格式化（4 空格）", Box::new(FormatJsonIndent4))
+                .menu("格式化（Tab）", Box::new(FormatJsonTab))
+                .separator()
+                .menu("按键名排序", Box::new(SortJsonKeys))
+                .menu("压缩为一行", Box::new(MinifyJson))
+        })
+}
+
 /// Windows / Linux 没有系统菜单栏，标题栏左侧放一个应用菜单。
 fn app_menu_button() -> impl IntoElement {
     Button::new("app-menu")
@@ -960,7 +1014,9 @@ fn app_menu_button() -> impl IntoElement {
                 .menu("关闭标签页", Box::new(CloseTab))
                 .separator()
                 .menu("格式化 JSON", Box::new(FormatDocument))
+                .menu("压缩 JSON", Box::new(MinifyJson))
                 .menu("切换主题", Box::new(ToggleTheme))
+                .menu("检查更新…", Box::new(CheckForUpdates))
                 .separator()
                 .menu("退出", Box::new(Quit))
         })
