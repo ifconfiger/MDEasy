@@ -4,7 +4,7 @@ members = ["crates/mdeasy-core", "crates/mdeasy-app", "tools/icon-gen"]
 default-members = ["crates/mdeasy-app"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/ifconfiger/MDEasy"

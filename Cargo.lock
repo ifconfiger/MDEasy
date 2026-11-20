@@ -3138,7 +3138,7 @@ dependencies = [
 
 [[package]]
 name = "icon-gen"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "resvg 0.47.0",
@@ -3882,7 +3882,7 @@ dependencies = [
 
 [[package]]
 name = "mdeasy"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "dirs 7.0.0",
@@ -3901,7 +3901,7 @@ dependencies = [
 
 [[package]]
 name = "mdeasy-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "dirs 7.0.0",

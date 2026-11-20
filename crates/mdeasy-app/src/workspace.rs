@@ -905,6 +905,13 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &Save, w, cx| this.save_active(false, w, cx)))
             .on_action(cx.listener(|this, _: &SaveAs, w, cx| this.save_active(true, w, cx)))
             .on_action(cx.listener(|this, _: &CloseTab, w, cx| {
+                // 没有标签页时，⌘W 直接退出程序
+                if this.docs.is_empty() {
+                    if this.request_quit(w, cx) {
+                        cx.quit();
+                    }
+                    return;
+                }
                 let ix = this.active;
                 this.close_tab(ix, w, cx)
             }))
