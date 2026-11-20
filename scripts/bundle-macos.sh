@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 打包 macOS 应用：target/release/MDEasy.app
 # 用法：scripts/bundle-macos.sh [--install] [--no-default] [--open]
+# 环境变量 MACOS_SIGN_IDENTITY：用该开发者证书签名（发布用），不设则临时签名
 #   --install     复制到 /Applications/MDEasy.app（文件关联指向安装后的路径，推荐）
 #   --no-default  不把 MDEasy 设为 md / json / yaml / toml 的默认打开程序
 #   --open        完成后启动
@@ -79,8 +80,14 @@ $(imported_type com.microsoft.jsonc "JSON with Comments" public.json jsonc)
 </plist>
 EOF
 
-# 本地临时签名，避免 Gatekeeper 直接拒绝运行（分发需换成开发者证书 + 公证）
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# 设置了 MACOS_SIGN_IDENTITY（如 "Developer ID Application: …"）时用开发者证书签名，
+# 开启 hardened runtime 并带时间戳，满足公证要求；否则本地临时签名
+if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then
+  codesign --force --options runtime --timestamp --sign "$MACOS_SIGN_IDENTITY" "$APP"
+  codesign --verify --strict --verbose=2 "$APP"
+else
+  codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+fi
 
 echo "已生成 $APP ($(du -sh "$APP" | cut -f1))"
 

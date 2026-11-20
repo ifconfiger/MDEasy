@@ -55,11 +55,7 @@ Windows 构建时自动把 `assets/icon/mdeasy.ico` 嵌入 exe。
 | Windows x64 | `MDEasy-<版本>-windows-x64.zip`，解压后运行 `mdeasy.exe` |
 | Linux x64 | `MDEasy-<版本>-linux-x64.tar.gz`，内含 `mdeasy`、`mdeasy.desktop`、图标 |
 
-macOS 安装包只做了临时签名（没有 Apple 开发者证书公证），第一次打开时如果提示“无法验证开发者”，在“系统设置 → 隐私与安全性”里点“仍要打开”，或运行：
-
-```bash
-xattr -dr com.apple.quarantine /Applications/MDEasy.app
-```
+macOS 安装包用 Developer ID 签名并经过 Apple 公证，可以直接打开。
 
 应用每天启动时会在后台检查一次新版本（菜单“检查更新…”可手动检查）。发现新版本后可以一键下载，校验 SHA-256 后替换当前程序并重启；从 `cargo run` 或 `target/` 目录运行的开发构建只提示、不自动安装。设置环境变量 `MDEASY_NO_UPDATE_CHECK=1` 可关闭自动检查；网络需要代理时可设置 `HTTPS_PROXY`。
 
@@ -67,7 +63,9 @@ xattr -dr com.apple.quarantine /Applications/MDEasy.app
 
 1. 修改根目录 `Cargo.toml` 的 `version`（如 `0.2.0`），提交
 2. 打标签并推送：`git tag v0.2.0 && git push origin v0.2.0`
-3. GitHub Actions（`.github/workflows/release.yml`）会在自带 runner 上构建三个平台的安装包、生成 `SHA256SUMS.txt` 并创建 Release，已安装的 MDEasy 随后就能检测到更新
+3. GitHub Actions（`.github/workflows/release.yml`）会在自带 runner 上构建三个平台的安装包（macOS 版签名 + 公证）、生成 `SHA256SUMS.txt` 并创建 Release，已安装的 MDEasy 随后就能检测到更新
+
+macOS 签名与公证使用组织 `ifconfiger` 的 Secret：`APPLE_SIGN_P12`（Developer ID Application 证书 p12 的 base64）、`APPLE_SIGN_PASSWORD`、`APPLE_NOTARY_KEY`（App Store Connect API Key 的 .p8 内容或 base64）、`APPLE_NOTARY_KEY_ID`、`APPLE_NOTARY_ISSUER`。缺少时自动退回临时签名。
 
 标签必须与 `Cargo.toml` 的版本一致，否则构建会失败。在 Actions 页面手动运行 Release workflow 只构建、不发布，可用来试构建。
 

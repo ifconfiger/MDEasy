@@ -64,13 +64,70 @@ jobs:
       - name: 测试核心库
         run: cargo test -p mdeasy-core
 
+      # 签名与公证用组织级 Secret：APPLE_SIGN_P12（Developer ID 证书 p12 的 base64）、APPLE_SIGN_PASSWORD、
+      # APPLE_NOTARY_KEY / APPLE_NOTARY_KEY_ID / APPLE_NOTARY_ISSUER（App Store Connect API Key）。
+      # 缺少时退回临时签名，构建不中断。
+      - name: 导入签名证书
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGN_P12: ${{ secrets.APPLE_SIGN_P12 }}
+          APPLE_SIGN_PASSWORD: ${{ secrets.APPLE_SIGN_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER }}
+        run: |
+          if [[ -z "$APPLE_SIGN_P12" || -z "$APPLE_SIGN_PASSWORD" ]]; then
+            echo "::warning::缺少 APPLE_SIGN_* Secret，使用临时签名，不公证"
+            exit 0
+          fi
+          if [[ -n "$APPLE_NOTARY_KEY" && -n "$APPLE_NOTARY_KEY_ID" && -n "$APPLE_NOTARY_ISSUER" ]]; then
+            echo "NOTARIZE=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::缺少 APPLE_NOTARY_* Secret，只签名不公证"
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          P12="$RUNNER_TEMP/cert.p12"
+          echo "$APPLE_SIGN_P12" | base64 --decode > "$P12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$APPLE_SIGN_PASSWORD" \
+            -f pkcs12 -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$P12"
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+          if [[ -z "$IDENTITY" ]]; then
+            echo "p12 里没有 Developer ID Application 证书" >&2
+            security find-identity -v -p codesigning "$KEYCHAIN" >&2
+            exit 1
+          fi
+          echo "MACOS_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
       - name: 打包 macOS
         if: runner.os == 'macOS'
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER }}
         run: |
           scripts/bundle-macos.sh --no-default
+          codesign -dv target/release/MDEasy.app 2>&1 | grep -E "Authority|TeamIdentifier|flags" || true
+          if [[ "${NOTARIZE:-}" == "1" ]]; then
+            ditto -c -k --keepParent target/release/MDEasy.app "$RUNNER_TEMP/notarize.zip"
+            scripts/notarize-macos.sh "$RUNNER_TEMP/notarize.zip" target/release/MDEasy.app
+            spctl --assess --type execute -vv target/release/MDEasy.app
+          fi
           mkdir -p dist
           ditto -c -k --keepParent target/release/MDEasy.app \
             "dist/MDEasy-${{ steps.version.outputs.version }}-macos-arm64.zip"
+
+      - name: 清理签名钥匙串
+        if: always() && runner.os == 'macOS' && env.KEYCHAIN != ''
+        run: security delete-keychain "$KEYCHAIN" || true
 
       - name: 打包 Windows
         if: runner.os == 'Windows'
