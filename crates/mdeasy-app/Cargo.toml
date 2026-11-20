@@ -1,0 +1,41 @@
+[package]
+name = "mdeasy"
+description = "MDEasy：轻量、高性能的跨平台 Markdown / JSON / YAML / TOML 编辑器"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "mdeasy"
+path = "src/main.rs"
+
+[dependencies]
+mdeasy-core.workspace = true
+futures-channel = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+anyhow.workspace = true
+gpui-kit = { version = "=0.10.0", features = [
+    # 编辑器高亮
+    "tree-sitter-markdown",
+    "tree-sitter-markdown-inline",
+    "tree-sitter-yaml",
+    "tree-sitter-toml",
+    # Markdown 预览中常见代码块
+    "tree-sitter-rust",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+    "tree-sitter-bash",
+    "tree-sitter-html",
+    "tree-sitter-css",
+    "tree-sitter-go",
+] }
+# 仅 screenshot 特性使用：打开 render_to_image（离屏渲染）
+gpui-pre-platform = { version = "=0.3.12", optional = true, features = ["test-support"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[features]
+# 开发用：设置 MDEASY_SCREENSHOT=<目录> 后自动截取各界面状态的离屏渲染图，用于视觉检查
+screenshot = ["dep:gpui-pre-platform"]

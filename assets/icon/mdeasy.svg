@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- MDEasy 应用图标（浅色）：白→浅蓝底的圆角方块 + 纸张 + Markdown "M↓" 标记 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E6EDFF"/>
+    </linearGradient>
+    <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="320" y1="320" x2="720" y2="570">
+      <stop offset="0" stop-color="#4F7BFF"/>
+      <stop offset="1" stop-color="#8A63F5"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F7F9FF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="20" flood-color="#2B3A6B" flood-opacity="0.16"/>
+    </filter>
+    <filter id="pageShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#3A4E9C" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <!-- 底板：遵循 macOS 图标网格（824 内容区，四周留 100） -->
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)" filter="url(#shadow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="184.5" fill="none" stroke="#D5DEF6" stroke-width="3"/>
+
+  <!-- 纸张 -->
+  <rect x="252" y="214" width="520" height="596" rx="60" fill="url(#page)" stroke="#DCE3F7" stroke-width="3" filter="url(#pageShadow)"/>
+
+  <!-- M↓ -->
+  <g fill="none" stroke="url(#mark)" stroke-width="50" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M338 548 V338 L432 444 L526 338 V548"/>
+    <path d="M650 338 V540"/>
+    <path d="M596 488 L650 546 L704 488"/>
+  </g>
+
+  <!-- 文本行 -->
+  <g stroke="#E1E7F8" stroke-width="26" stroke-linecap="round">
+    <path d="M338 640 H686"/>
+    <path d="M338 706 H566"/>
+  </g>
+</svg>

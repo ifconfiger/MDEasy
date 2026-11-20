@@ -1,0 +1,11 @@
+[package]
+name = "icon-gen"
+description = "把 assets/icon/mdeasy.svg 渲染成各尺寸 PNG、macOS iconset 和 Windows .ico"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+resvg = "0.47"
