@@ -684,6 +684,9 @@ impl Workspace {
                 .bg(theme.background)
                 .child(
                     TextView::new(md)
+                        // 元素每次渲染都会把自己的 scrollable 写回 state，只在
+                        // TextViewState 上设置会被覆盖成 false，滚轮就无法滚动
+                        .scrollable(true)
                         .h_full()
                         .w_full()
                         .max_w(px(900.))
